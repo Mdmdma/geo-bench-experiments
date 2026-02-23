@@ -1,0 +1,31 @@
+experiment:
+  generate_experiment_dir: /scratch3/merler/geo-bench-experiments/experiments/prithvi_dummy
+  experiment_name: 1.00x_train_prithvi_v2
+  # benchmark_dir must be the full path to the benchmark (not the parent directory).
+  # task_iterator(benchmark_dir=...) uses it directly as the root to scan for dataset sub-folders.
+  benchmark_dir: /scratch3/merler/geo-bench/datasets/classification_v1.0
+  benchmark_name: classification_v1.0
+  partition_name: 1.00x_train
+  # NOTE: despite the name, ignore_tasks acts as a KEEP-LIST (tasks to run).
+  # Leave out any dataset to skip it for this dummy run.
+  ignore_tasks: ["m-eurosat"]
+  num_seeds: 1
+
+datamodule:
+  _target_: geobench_exp.torch_toolbox.dataset.DataModule
+  num_workers: 2
+  batch_size: 32
+  band_names: "all"  # overridden by model config to the 6 HLS bands
+  format: hdf5
+
+trainer:
+  _target_: lightning.Trainer
+  devices: [0]
+  accelerator: gpu
+  max_epochs: 100
+  max_steps: -1
+  limit_val_batches: 1.0
+  limit_test_batches: 1.0
+  val_check_interval: 1.0
+  log_every_n_steps: 5
+  enable_progress_bar: true

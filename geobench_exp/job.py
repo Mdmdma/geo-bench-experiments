@@ -98,10 +98,16 @@ class Job:
         Args:
             job_dir: job directory from which to run job
         """
+        import os
+
         script_path = self.dir / "run.sh"
+        # Persist GEO_BENCH_DIR in the script so it can be sourced without extra env vars.
+        geo_bench_dir = os.environ.get("GEO_BENCH_DIR", "")
         with open(script_path, "w") as fd:
             fd.write("#!/bin/bash\n")
-            fd.write("# Usage: sh run.sh path/to/model_generator.py\n\n")
+            fd.write("# Usage: sh run.sh\n\n")
+            if geo_bench_dir:
+                fd.write(f"export GEO_BENCH_DIR={geo_bench_dir}\n")
             fd.write(f"geobench_exp-run_exp --job_dir {job_dir}")
         script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 

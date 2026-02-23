@@ -76,9 +76,24 @@ geobench_exp-gen_exp \
   --task_config_path geobench_exp/configs/classification_task.yaml \
   --model_config_path geobench_exp/configs/model_configs/classification/resnet18.yaml
 
-# Then execute any generated run.sh, e.g.:
+# Then execute any generated run.sh inside a tmux session so the user can
+# detach/reattach and monitor live progress at any time:
+tmux new-session -s experiment       # create a named session
 sh experiments/0.01x_train_.../m-eurosat/seed_0/run.sh
+# Detach with Ctrl-b d; reattach with: tmux attach -t experiment
 ```
+
+**Running long / background experiments — always use tmux, never nohup:**
+- Start a named session: `tmux new-session -s <name>`
+- Split pane to watch GPU live: `Ctrl-b %` then `watch -n2 nvidia-smi`
+- Detach without killing: `Ctrl-b d`
+- Reattach later: `tmux attach -t <name>`
+- List sessions: `tmux ls`
+- Tail the CSV metrics from outside the session:
+  ```bash
+  tail -f experiments/.../csv_logs/version_0/metrics.csv
+  ```
+- Do **not** use `nohup ... &` — it hides output and makes progress monitoring harder.
 
 ## Key External Dependencies
 - `geo-benchmark` (`geobench`) – `TaskSpecifications`, `task_iterator`, `Sample` objects from HDF5 data

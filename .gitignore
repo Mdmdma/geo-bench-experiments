@@ -1,6 +1,9 @@
 # Checkpoints
 checkpoints/*
 
+# files generated from experiments
+experiments/prithvi_dummy/
+
 # Datasets
 datasets/eurosat/
 datasets/oscd/

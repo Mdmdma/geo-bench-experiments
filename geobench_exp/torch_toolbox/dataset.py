@@ -8,10 +8,9 @@ import numpy as np
 import torch
 from geobench.dataset import Band, Sample
 from geobench.task import TaskSpecifications
-from kornia.augmentation import ImageSequential
+from kornia.augmentation import AugmentationSequential, ImageSequential
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader
-from torchgeo.transforms import AugmentationSequential
 
 
 def get_transform(task_specs, config, train):
@@ -25,7 +24,10 @@ def get_transform(task_specs, config, train):
 
 
 def get_desired_input_sizes(model_name: str) -> int:
-    """Define input sizes for models."""
+    """Define input sizes for models.
+
+    Unknown model names (e.g. Prithvi variants) default to 224.
+    """
     input_size_dict = {
         "resnet18": 224,
         "resnet50": 224,
@@ -33,8 +35,15 @@ def get_desired_input_sizes(model_name: str) -> int:
         "vit_tiny_patch16_224": 224,
         "vit_small_patch16_224": 224,
         "swinv2_tiny_window16_256": 256,
+        # Prithvi-EO v2 variants (patch_size 16 -> 224 is the native resolution)
+        "prithvi_eo_v2_tiny_tl": 224,
+        "prithvi_eo_v2_100": 224,
+        "prithvi_eo_v2_100_tl": 224,
+        "prithvi_eo_v2_tiny_tl": 224,
+        "prithvi_eo_v2_300": 224,
+        "prithvi_eo_v2_300_tl": 224,
     }
-    return input_size_dict[model_name]
+    return input_size_dict.get(model_name, 224)  # default to 224 for unknown models
 
 
 def get_classification_transform(task_specs, config: Dict[str, Any], train=True) -> Callable[[Sample], Dict[str, Any]]:
@@ -56,7 +65,9 @@ def get_classification_transform(task_specs, config: Dict[str, Any], train=True)
         partition_name=config["experiment"]["partition_name"],
     ).normalization_stats()
 
-    desired_input_size = get_desired_input_sizes(config["model"]["model"])
+    # ``model`` key is set for timm-based models; Prithvi configs use ``prithvi_variant``.
+    _model_name = config["model"].get("model") or config["model"].get("prithvi_variant", "")
+    desired_input_size = get_desired_input_sizes(_model_name)
 
     if train:
         t = ImageSequential(

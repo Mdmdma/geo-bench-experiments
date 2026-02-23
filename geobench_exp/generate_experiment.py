@@ -30,8 +30,13 @@ def generate_experiment_name(config: dict) -> str:
         experiment_prefix += f"{config['model']['weights']}"
     if "model" in config["model"]:
         experiment_prefix += f"{config['model']['model']}"
-    else:
+    elif "encoder_type" in config["model"] and "decoder_type" in config["model"]:
         experiment_prefix += f"{config['model']['encoder_type']}_{config['model']['decoder_type']}"
+    elif "prithvi_variant" in config["model"]:
+        experiment_prefix += f"{config['model']['prithvi_variant']}"
+    else:
+        # fallback: derive a name from the _target_ class path
+        experiment_prefix += config["model"].get("_target_", "unknown").split(".")[-1]
 
     if config["experiment"]["experiment_name"] is not None:
         experiment_dir: Path = Path(config["experiment"]["generate_experiment_dir"]) / experiment_prefix

@@ -1,0 +1,45 @@
+experiment:
+  generate_experiment_dir: /scratch3/merler/geo-bench-experiments/experiments/prithvi_forestnet
+  experiment_name: 1.00x_train_prithvi_v2_forestnet
+  benchmark_dir: /scratch3/merler/geo-bench/datasets/classification_v1.0
+  benchmark_name: classification_v1.0
+  partition_name: 1.00x_train
+  ignore_tasks:
+  - m-forestnet
+  num_seeds: 1
+  seed: 0
+datamodule:
+  _target_: geobench_exp.torch_toolbox.dataset.DataModule
+  num_workers: 2
+  batch_size: 32
+  band_names:
+  - 04 - Red
+  - 03 - Green
+  - 02 - Blue
+  - 05 - NIR
+  - 06 - SWIR1
+  - 07 - SWIR2
+  format: hdf5
+trainer:
+  _target_: lightning.Trainer
+  devices:
+  - 0
+  accelerator: gpu
+  max_epochs: 100
+  max_steps: -1
+  limit_val_batches: 1.0
+  limit_test_batches: 1.0
+  val_check_interval: 1.0
+  log_every_n_steps: 5
+  enable_progress_bar: true
+model:
+  _target_: geobench_exp.torch_toolbox.prithvi_model.GeoBenchPrithviClassifier
+  prithvi_variant: prithvi_eo_v2_100_tl
+  pretrained: true
+  freeze_backbone: false
+  optimizer:
+    _target_: torch.optim.AdamW
+    _partial_: true
+    lr: 0.0001
+    weight_decay: 0.05
+  in_channels: 6

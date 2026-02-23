@@ -1,0 +1,22 @@
+model:
+  _target_: geobench_exp.torch_toolbox.prithvi_model.GeoBenchPrithviClassifier
+  prithvi_variant: "prithvi_eo_v2_100_tl"  # 100M Prithvi-EO v2 (TL = temporal+location encoding available)
+  pretrained: true                          # load weights from HuggingFace (ibm-nasa-geospatial/Prithvi-EO-2.0-100M-TL)
+  freeze_backbone: false                 # set to true for linear probing
+  optimizer:
+    _target_: torch.optim.AdamW
+    _partial_: true
+    lr: 1e-4
+    weight_decay: 0.05
+
+datamodule:
+  batch_size: 32
+  # Use the 6 HLS bands that Prithvi v2 was pre-trained on:
+  #   Blue (B02), Green (B03), Red (B04), NIR-Narrow (B08A), SWIR-1 (B11), SWIR-2 (B12)
+  band_names:
+    - "02 - Blue"
+    - "03 - Green"
+    - "04 - Red"
+    - "08A - Vegetation Red Edge"
+    - "11 - SWIR"
+    - "12 - SWIR"
