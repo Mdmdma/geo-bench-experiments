@@ -5,6 +5,7 @@ import time
 from typing import Callable, Dict, List, Optional, Union
 
 import lightning
+import numpy as np
 import segmentation_models_pytorch as smp
 import timm
 import torch
@@ -15,10 +16,13 @@ from geobench.label import Classification, MultiLabelClassification
 from geobench.task import TaskSpecifications
 from lightning import LightningModule
 from lightning.pytorch.cli import LRSchedulerCallable, OptimizerCallable
+from lightning.pytorch.loggers import WandbLogger
 from torch import Tensor
 from torchgeo.models import get_weight
 from torchgeo.trainers import utils
 from torchvision.models._api import WeightsEnum
+
+
 
 
 class GeoBenchBaseModule(LightningModule):
@@ -59,6 +63,10 @@ class GeoBenchBaseModule(LightningModule):
         self.test_metrics = eval_metrics_generator(task_specs)
 
         self.configure_the_model()
+
+        # Fixed val sample for WandB triplet tracking (set once on first val pass).
+        self._fixed_val_input: Optional[Tensor] = None
+        self._fixed_val_target: Optional[Tensor] = None
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass.
@@ -121,6 +129,10 @@ class GeoBenchBaseModule(LightningModule):
         self.log(f"{self.prefix}_loss", loss)
         if self.prefix == "val":
             self.eval_metrics(output, target)
+            # Cache the very first sample once — reused every epoch for the WandB triplet.
+            if self._fixed_val_input is None and batch_idx == 0:
+                self._fixed_val_input = inputs[0:1].detach().cpu()
+                self._fixed_val_target = target[0:1].detach().cpu()
         else:
             self.test_metrics(output, target)
 
@@ -138,6 +150,156 @@ class GeoBenchBaseModule(LightningModule):
         test_metrics = self.test_metrics.compute()
         self.log_dict({f"test_{k}": v.mean() for k, v in test_metrics.items()}, logger=True)
         self.test_metrics.reset()
+
+        self._maybe_log_wandb_images()
+
+    # ------------------------------------------------------------------
+    # WandB image triplet visualisation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_rgb_uint8(tensor: Tensor) -> "np.ndarray":
+        """Convert a (C, H, W) float tensor to an (H, W, 3) uint8 RGB array.
+
+        Uses the first three channels as R, G, B and applies a per-image
+        percentile stretch (2nd–98th) so the image looks sensible regardless
+        of normalisation.
+        """
+        img = tensor[:3].float().numpy()  # (3, H, W)
+        out = np.zeros((img.shape[1], img.shape[2], 3), dtype=np.uint8)
+        for i in range(3):
+            ch = img[i]
+            lo, hi = np.percentile(ch, 2), np.percentile(ch, 98)
+            if hi > lo:
+                ch = (ch - lo) / (hi - lo)
+            else:
+                ch = np.zeros_like(ch)
+            out[:, :, i] = (np.clip(ch, 0, 1) * 255).astype(np.uint8)
+        return out
+
+    @staticmethod
+    def _colorise_mask(mask: Tensor, n_classes: int) -> "np.ndarray":
+        """Map an integer class mask (H, W) to an (H, W, 3) uint8 colour image."""
+        palette = np.array(
+            [
+                [int((i * 67 + 41) % 256), int((i * 113 + 97) % 256), int((i * 151 + 53) % 256)]
+                for i in range(n_classes)
+            ],
+            dtype=np.uint8,
+        )
+        return palette[mask.numpy().astype(int)]
+
+    @staticmethod
+    def _draw_label_panel(H: int, W: int, colour: "np.ndarray", label: str) -> "np.ndarray":
+        """Render a solid-colour block of size (H, W, 3) with *label* centred over it."""
+        from PIL import Image, ImageDraw, ImageFont
+
+        panel = np.full((H, W, 3), colour, dtype=np.uint8)
+        img = Image.fromarray(panel)
+        draw = ImageDraw.Draw(img)
+
+        # Choose a font size that fits within the panel width.
+        font: ImageFont.ImageFont
+        font_size = max(12, W // 8)
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        except (IOError, OSError):
+            font = ImageFont.load_default()
+
+        # Measure text and wrap long labels at word boundaries; honour explicit newlines.
+        paragraphs = label.split("\n")
+        lines: List[str] = []
+        for para in paragraphs:
+            words = para.split()
+            current = ""
+            for word in words:
+                test = (current + " " + word).strip()
+                bbox = draw.textbbox((0, 0), test, font=font)
+                if bbox[2] - bbox[0] > W - 8 and current:
+                    lines.append(current)
+                    current = word
+                else:
+                    current = test
+            if current:
+                lines.append(current)
+
+        # Compute total text block height and pick a contrasting text colour.
+        line_h = draw.textbbox((0, 0), "A", font=font)[3] + 2
+        total_h = line_h * len(lines)
+        y0 = (H - total_h) // 2
+        brightness = int(colour[0]) * 299 + int(colour[1]) * 587 + int(colour[2]) * 114
+        text_colour = (0, 0, 0) if brightness > 128_000 else (255, 255, 255)
+
+        for i, line in enumerate(lines):
+            bbox = draw.textbbox((0, 0), line, font=font)
+            x = (W - (bbox[2] - bbox[0])) // 2
+            draw.text((x, y0 + i * line_h), line, fill=text_colour, font=font)
+
+        return np.array(img)
+
+    def _maybe_log_wandb_images(self) -> None:
+        """Log a single fixed-sample triplet (image | GT | pred) to WandB each epoch.
+
+        The same validation sample is reused every epoch so the model's evolution
+        on that sample can be tracked over time.  No-ops when WandB is not active.
+        """
+        try:
+            import wandb
+        except ImportError:
+            return
+
+        wandb_logger: Optional[WandbLogger] = None
+        for logger in self.loggers:
+            if isinstance(logger, WandbLogger):
+                wandb_logger = logger
+                break
+        if wandb_logger is None or self._fixed_val_input is None:
+            return
+
+        is_segmentation = isinstance(self.task_specs.label_type, SegmentationClasses)
+        n_classes = self.task_specs.label_type.n_classes
+        class_names = getattr(self.task_specs.label_type, "class_names", None)
+
+        # Re-run inference on the fixed sample with no gradient.
+        with torch.no_grad():
+            logits = self(self._fixed_val_input.to(self.device))  # (1, n_classes, ...)
+        pred = logits.argmax(dim=1).squeeze(0).cpu()  # scalar or (H, W)
+
+        inp = self._fixed_val_input[0]   # (C, H, W)
+        gt = self._fixed_val_target[0]   # scalar tensor or (H, W)
+
+        rgb = self._to_rgb_uint8(inp)    # (H, W, 3)
+        H, W = rgb.shape[:2]
+
+        if is_segmentation:
+            gt_panel = self._colorise_mask(gt, n_classes)       # (H, W, 3)
+            pred_panel = self._colorise_mask(pred, n_classes)   # (H, W, 3)
+            caption = f"epoch {self.current_epoch}  |  image · GT · pred"
+        else:
+            gt_idx = int(gt.item()) if gt.ndim == 0 else int(gt.argmax().item())
+            pred_idx = int(pred.item())
+            if class_names and gt_idx < len(class_names):
+                gt_label = class_names[gt_idx]
+                pred_label = class_names[pred_idx] if pred_idx < len(class_names) else str(pred_idx)
+            else:
+                gt_label, pred_label = str(gt_idx), str(pred_idx)
+            # Render GT and pred as colour blocks with the class label overlaid.
+            palette = np.array(
+                [[int((i * 67 + 41) % 256), int((i * 113 + 97) % 256), int((i * 151 + 53) % 256)]
+                 for i in range(n_classes)],
+                dtype=np.uint8,
+            )
+            gt_panel = self._draw_label_panel(H, W, palette[gt_idx % n_classes], f"GT\n{gt_label}")
+            pred_panel = self._draw_label_panel(H, W, palette[pred_idx % n_classes], f"Pred\n{pred_label}")
+            correct = "\u2713" if gt_idx == pred_idx else "\u2717"
+            caption = f"epoch {self.current_epoch}  {correct}  GT: {gt_label} | Pred: {pred_label}"
+
+        # Single horizontally-stacked panel: image | GT | pred
+        panel = np.concatenate([rgb, gt_panel, pred_panel], axis=1)
+        wandb_logger.experiment.log(
+            {"val_triplet": wandb.Image(panel, caption=caption), "epoch": self.current_epoch},
+            step=wandb_logger.experiment.step,
+        )
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         """Define steps taken during test mode.
