@@ -103,12 +103,15 @@ class Job:
         script_path = self.dir / "run.sh"
         # Persist GEO_BENCH_DIR in the script so it can be sourced without extra env vars.
         geo_bench_dir = os.environ.get("GEO_BENCH_DIR", "")
+        # Resolve the project root (two levels above this file: job.py -> geobench_exp -> project root)
+        project_root = Path(__file__).resolve().parent.parent
         with open(script_path, "w") as fd:
             fd.write("#!/bin/bash\n")
             fd.write("# Usage: sh run.sh\n\n")
             if geo_bench_dir:
                 fd.write(f"export GEO_BENCH_DIR={geo_bench_dir}\n")
-            fd.write(f"geobench_exp-run_exp --job_dir {job_dir}")
+            fd.write(f"cd {project_root}\n")
+            fd.write(f"uv run geobench_exp-run_exp --job_dir {job_dir}")
         script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 
     def write_wandb_sweep_cl_script(
