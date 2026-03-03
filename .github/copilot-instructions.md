@@ -25,6 +25,28 @@ Configs are split into **task configs** (`geobench_exp/configs/classification_ta
 - `in_channels` is auto-set from the band count when `band_names: "all"`
 - WandB logging is opt-in: add a `wandb:` section to the config; omitting it uses CSV-only logging
 
+### Selecting which datasets to run: `ignore_tasks`
+
+**Despite its misleading name, `ignore_tasks` is an allow-list (keep-list), not an exclude-list.**
+
+If `ignore_tasks` is set, `generate_experiment.py` will generate jobs **only** for the datasets listed. If `ignore_tasks` is absent or `null`, jobs are generated for **all** datasets in the benchmark.
+
+Usage in a task config YAML:
+```yaml
+experiment:
+  # Run only these two datasets (all others are skipped):
+  ignore_tasks: ["m-eurosat", "m-forestnet"]
+```
+
+To run every dataset, simply omit the key or comment it out:
+```yaml
+experiment:
+  # ignore_tasks: [...]   # commented out → all datasets are benchmarked
+```
+
+Available classification dataset names (from `classification_v1.0`):
+`m-brick-kiln`, `m-bigearthnet`, `m-eurosat`, `m-so2sat`, `m-pv4ger`, `m-forestnet`, `m-cashew-plantation`, `m-SA-crop-type`, `m-nz-cattle`, `m-NeonTree`
+
 ## Adding a New Model
 1. Create a YAML under `geobench_exp/configs/model_configs/<task>/yourmodel.yaml` with the appropriate `_target_`, backbone/decoder keys, optimizer, and `batch_size` override.
 2. If the model class doesn't exist, subclass `GeoBenchBaseModule` and implement `configure_the_model()` to assign `self.model`.
@@ -42,37 +64,36 @@ Override with `early_stopping_metric` in the model config.
 
 ## Developer Workflows
 
-**Conda environments:**
-- Default: activate the `geobench-experiments` conda environment for all standard work.
-- TerraTorch / Prithvi models: use the separate `terratorch` conda environment when downloading or importing models via `terratorch` (e.g. `PrithviModelFactory`). The two environments are not interchangeable.
+**Environment:** the project uses a `uv`-managed virtual environment (`.venv/` at the repo root). All commands must be prefixed with `uv run` or run after `source .venv/bin/activate`. Never use conda for this project.
 
 **Known dependency issues:**
-- `pandas==1.5.x` (pinned in `pyproject.toml`) can conflict with other packages. Resolve on a case-by-case basis — typically by temporarily relaxing the pin in the active environment rather than changing `pyproject.toml`.
+- If a package is missing at runtime, install it with `uv pip install <package>` — do **not** edit `pyproject.toml` unless adding a permanent dependency.
 
 **Install (editable):**
 ```bash
-conda activate geobench-experiments
-pip install -e ".[dev]"
+uv sync           # create/update .venv from pyproject.toml
+uv pip install -e ".[dev]"
 pre-commit install
 ```
 
 **Run tests** (uses test HDF5 data in `tests/data/`):
 ```bash
-pytest                          # all standard tests
-pytest --optional               # includes slow/optional tests
-pytest -m "not slow"            # skip slow tests
+uv run pytest                          # all standard tests
+uv run pytest --optional               # includes slow/optional tests
+uv run pytest -m "not slow"            # skip slow tests
 ```
 
 **Lint / format:**
 ```bash
-black geobench_exp tests
-isort geobench_exp tests
-flake8 geobench_exp tests       # max-line-length=120
+uv run black geobench_exp tests
+uv run isort geobench_exp tests
+uv run flake8 geobench_exp tests       # max-line-length=120
 ```
 
 **Generate + run a quick experiment:**
 ```bash
-geobench_exp-gen_exp \
+export GEO_BENCH_DIR=/scratch3/merler/geo-bench/datasets
+uv run geobench_exp-gen_exp \
   --task_config_path geobench_exp/configs/classification_task.yaml \
   --model_config_path geobench_exp/configs/model_configs/classification/resnet18.yaml
 
@@ -82,6 +103,20 @@ tmux new-session -s experiment       # create a named session
 sh experiments/0.01x_train_.../m-eurosat/seed_0/run.sh
 # Detach with Ctrl-b d; reattach with: tmux attach -t experiment
 ```
+
+**CRITICAL — always export `GEO_BENCH_DIR` before generating experiments:**
+`job.py` captures `GEO_BENCH_DIR` at generation time and writes it into the generated `run.sh`. If the variable is not set when `gen_exp` runs, the `export` line is omitted from `run.sh`. At runtime, `TaskSpecifications.get_dataset_dir()` then resolves paths using geobench's hardcoded default (`~/dataset/geobench/...`), causing a `ValueError: dataset_dir ... does not exist`.
+
+- **Always generate with the variable set:**
+  ```bash
+  export GEO_BENCH_DIR=/scratch3/merler/geo-bench/datasets
+  uv run geobench_exp-gen_exp ...
+  ```
+- **If a run fails with that error on an already-generated job**, add the missing line to `run.sh` manually:
+  ```bash
+  # Insert after the #!/bin/bash shebang, before the cd line:
+  export GEO_BENCH_DIR=/scratch3/merler/geo-bench/datasets
+  ```
 
 **Running long / background experiments — always use tmux, never nohup:**
 - Start a named session: `tmux new-session -s <name>`
@@ -102,4 +137,5 @@ sh experiments/0.01x_train_.../m-eurosat/seed_0/run.sh
 - `lightning` (PyTorch Lightning) – training loop
 - `omegaconf` + `hydra-core` – config merging and class instantiation
 - `kornia` – image augmentation pipeline
-- `wandb==0.13.10` – optional experiment tracking
+- `terratorch` – Prithvi-EO v2 backbone factory (installed via `uv pip install terratorch`)
+- `wandb` – optional experiment tracking (add a `wandb:` section to the task config to enable)
