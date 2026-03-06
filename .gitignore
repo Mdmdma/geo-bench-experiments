@@ -2,12 +2,15 @@
 checkpoints/*
 
 # files generated from experiments
-experiments/prithvi_dummy/
+experiments/
 
 # Datasets
 datasets/eurosat/
 datasets/oscd/
 *.zip
+
+.github/copilot-instructions.md
+
 
 # toolkit files personal changes
 # climate-change-benchmark/toolkit/dispatch_toolkit.py
@@ -44,6 +47,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+uv.lock
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

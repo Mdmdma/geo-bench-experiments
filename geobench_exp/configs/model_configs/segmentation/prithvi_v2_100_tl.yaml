@@ -1,0 +1,16 @@
+model:
+  _target_: geobench_exp.torch_toolbox.prithvi_model.GeoBenchPrithviSegmentation
+  prithvi_variant: "prithvi_eo_v2_100_tl"  # 100M Prithvi-EO v2 (TL = temporal+location encoding available)
+  pretrained: true                          # load weights from HuggingFace (ibm-nasa-geospatial/Prithvi-EO-2.0-100M-TL)
+  freeze_backbone: false                    # set to true for linear probing
+  decoder_type: "UperNetDecoder"            # terratorch decoder: UperNetDecoder, FCNDecoder, etc.
+  optimizer:
+    _target_: torch.optim.AdamW
+    _partial_: true
+    lr: 6e-5
+    weight_decay: 0.05
+
+datamodule:
+  batch_size: 8
+  # Use all available bands; in_channels is resolved automatically from TaskSpecifications.
+  band_names: "all"

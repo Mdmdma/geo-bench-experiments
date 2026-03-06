@@ -26,6 +26,9 @@ def generate_trainer(config: dict, job) -> Trainer:
     ]
     if "wandb" in config:
         config["wandb"]["wandb_run_id"] = run_id
+        ds_name_short = job.task_specs.dataset_name
+        base_name = config["wandb"].get("name", None)
+        run_name = f"{base_name}_{ds_name_short}" if base_name else ds_name_short
         loggers.append(
             WandbLogger(
                 save_dir=str(job.dir),
@@ -33,7 +36,7 @@ def generate_trainer(config: dict, job) -> Trainer:
                 entity=config["wandb"]["entity"],
                 id=run_id,
                 group=config["wandb"].get("wandb_group", None),
-                name=config["wandb"].get("name", None),
+                name=run_name,
                 resume="allow",
                 config=config["model"],
                 mode=config["wandb"].get("mode", "online"),
@@ -64,11 +67,28 @@ def generate_trainer(config: dict, job) -> Trainer:
         "m-SA-crop-type",
         "m-seasonet",
         "m-chesapeake-landcover",
+        "m-chesapeake",
         "m-NeonTree",
         "m-cashew-plantation",
+        "m-cashew-plant",
     ]:
         track_metric = "val_Jaccard"
         mode = "max"
+    else:
+        # Fallback: infer metric from task label type
+        from geobench.dataset import SegmentationClasses
+        from geobench.label import MultiLabelClassification
+
+        label_type = job.task_specs.label_type.__class__
+        if label_type is SegmentationClasses:
+            track_metric = "val_Jaccard"
+            mode = "max"
+        elif label_type is MultiLabelClassification:
+            track_metric = "val_F1Score"
+            mode = "max"
+        else:
+            track_metric = "val_Accuracy"
+            mode = "max"
 
     if "early_stopping_metric" in config["model"]:
         track_metric = config["model"]["early_stopping_metric"]

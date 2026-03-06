@@ -113,14 +113,30 @@ def get_segmentation_transform(
         raise (RuntimeError("Only square patches are supported in this version"))
     h32 = w32 = int(32 * (h // 32))  # make input res multiple of 32
 
-    mean, std = task_specs.get_dataset(
+    train_ds = task_specs.get_dataset(
         split="train",
         format=config["datamodule"]["format"],
         band_names=tuple(config["datamodule"]["band_names"]),
         # benchmark_dir=config["experiment"]["benchmark_dir"],
         partition_name=config["experiment"]["partition_name"],
-    ).rgb_stats()
+    )
     band_names = config["datamodule"]["band_names"]
+    mean, std = train_ds.normalization_stats()
+
+    # Some bands (e.g. HyperSpectralBands 'Neon' in m-NeonTree) contain
+    # multiple sub-channels that pack_to_3d expands.  normalization_stats()
+    # returns one scalar per band name, so we expand to one per actual channel
+    # using MultiBand.n_bands from task_specs.bands_info.
+    from geobench.dataset import MultiBand
+
+    info_by_name = {bi.name: bi for bi in task_specs.bands_info}
+    expanded_mean, expanded_std = [], []
+    for b_name, m, s in zip(band_names, mean, std):
+        bi = info_by_name.get(b_name)
+        n_ch = bi.n_bands if (isinstance(bi, MultiBand) and bi.n_bands) else 1
+        expanded_mean.extend([m] * n_ch)
+        expanded_std.extend([s] * n_ch)
+    mean, std = expanded_mean, expanded_std
 
     if train:
         t = AugmentationSequential(
@@ -128,17 +144,17 @@ def get_segmentation_transform(
             K.RandomHorizontalFlip(p=0.5),
             K.RandomVerticalFlip(p=0.5),
             K.Resize((h32, w32)),
-            data_keys=["image", "mask"],
+            data_keys=None,
         )
     else:
         t = AugmentationSequential(
             K.Normalize(mean=torch.Tensor(mean), std=torch.Tensor(std)),
             K.Resize((h32, w32)),
-            data_keys=["image", "mask"],
+            data_keys=None,
         )
 
     def transform(sample: Sample):
-        x = sample.pack_to_3d(band_names=band_names)[0].astype("float32")
+        x = sample.pack_to_3d(band_names=band_names, resample=True)[0].astype("float32")
 
         if isinstance(sample.label, Band):
             # kornia expects channel first and label to have a channel
@@ -149,7 +165,7 @@ def get_segmentation_transform(
 
         return {
             "input": transformed["image"].squeeze(0),
-            "label": transformed["mask"].squeeze(0).to(dtype=torch.long),
+            "label": transformed["mask"].squeeze().to(dtype=torch.long),
         }
 
     return transform

@@ -1,10 +1,10 @@
 experiment:
-  generate_experiment_dir: /scratch3/merler/geo-bench-experiments/experiments/prithvi_forestnet
-  experiment_name: 1.00x_train_prithvi_v2_forestnet
+  generate_experiment_dir: /scratch3/merler/geo-bench-experiments/experiments/prithvi_bigearthnet
+  experiment_name: 1.00x_train_prithvi_v2_bigearthnet
   benchmark_dir: /scratch3/merler/geo-bench/datasets/classification_v1.0
   benchmark_name: classification_v1.0
   partition_name: 1.00x_train
-  ignore_tasks: ["m-forestnet"]
+  ignore_tasks: ["m-bigearthnet"]
   num_seeds: 1
 
 datamodule:
@@ -29,6 +29,6 @@ trainer:
 wandb:
   project: geo-bench-experiments
   entity: merler
-  wandb_group: prithvi_v2_forestnet
-  name: prithvi_eo_v2_100_tl_forestnet
+  wandb_group: prithvi_v2_bigearthnet
+  name: prithvi_eo_v2_100_tl_bigearthnet
   mode: online

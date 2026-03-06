@@ -1,0 +1,14 @@
+model:
+  _target_: geobench_exp.torch_toolbox.prithvi_model.GeoBenchPrithviClassifier
+  prithvi_variant: "prithvi_eo_v2_tiny_tl"
+  pretrained: true
+  freeze_backbone: false
+  optimizer:
+    _target_: torch.optim.AdamW
+    _partial_: true
+    lr: 1e-4
+    weight_decay: 0.05
+
+datamodule:
+  batch_size: 32
+  band_names: "all"   # resolved to all dataset bands at generation time

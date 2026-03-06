@@ -1,16 +1,16 @@
 experiment:
-  generate_experiment_dir: /scratch3/merler/geo-bench-experiments/experiments/prithvi_forestnet
-  experiment_name: 1.00x_train_prithvi_v2_forestnet
-  benchmark_dir: /scratch3/merler/geo-bench/datasets/classification_v1.0
-  benchmark_name: classification_v1.0
+  generate_experiment_dir: /scratch3/merler/geo-bench-experiments/experiments/prithvi_segmentation
+  experiment_name: 1.00x_train_prithvi_v2_seg
+  benchmark_dir: /scratch3/merler/geo-bench/datasets/segmentation_v1.0
+  benchmark_name: segmentation_v1.0
   partition_name: 1.00x_train
-  ignore_tasks: ["m-forestnet"]
+  ignore_tasks: ["m-pv4ger-seg"]
   num_seeds: 1
 
 datamodule:
   _target_: geobench_exp.torch_toolbox.dataset.DataModule
-  num_workers: 2
-  batch_size: 32
+  num_workers: 4
+  batch_size: 8
   band_names: "all"
   format: hdf5
 
@@ -18,7 +18,7 @@ trainer:
   _target_: lightning.Trainer
   devices: [0]
   accelerator: gpu
-  max_epochs: 100
+  max_epochs: 80
   max_steps: -1
   limit_val_batches: 1.0
   limit_test_batches: 1.0
@@ -29,6 +29,6 @@ trainer:
 wandb:
   project: geo-bench-experiments
   entity: merler
-  wandb_group: prithvi_v2_forestnet
-  name: prithvi_eo_v2_100_tl_forestnet
+  wandb_group: prithvi_v2_seg
+  name: prithvi_eo_v2_100_tl_pv4ger_seg
   mode: online

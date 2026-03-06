@@ -46,6 +46,25 @@ def generate_experiment_name(config: dict) -> str:
     return experiment_dir
 
 
+def _count_channels(band_names: list, bands_info_list: list) -> int:
+    """Return total number of input channels, accounting for MultiBand entries.
+
+    A MultiBand (e.g. HyperSpectralBands) contributes ``band_info.n_bands``
+    channels when unpacked by ``pack_to_3d``; all other bands contribute 1.
+    """
+    from geobench.dataset import MultiBand
+
+    info_by_name = {bi.name: bi for bi in bands_info_list}
+    total = 0
+    for name in band_names:
+        bi = info_by_name.get(name)
+        if bi is not None and isinstance(bi, MultiBand) and bi.n_bands:
+            total += bi.n_bands
+        else:
+            total += 1
+    return total
+
+
 def get_band_names(config: Dict[str, Any], task_specs) -> Dict[str, Any]:
     """Get the appropriate band names for experiments.
 
@@ -57,10 +76,13 @@ def get_band_names(config: Dict[str, Any], task_specs) -> Dict[str, Any]:
         config: dictionary containing config
     """
     if config["datamodule"]["band_names"] == "all":
-        config["model"]["in_channels"] = len(task_specs.bands_info)
-        config["datamodule"]["band_names"] = [band_info.name for band_info in task_specs.bands_info]
+        band_names = [band_info.name for band_info in task_specs.bands_info]
+        config["datamodule"]["band_names"] = band_names
+        config["model"]["in_channels"] = _count_channels(band_names, task_specs.bands_info)
     else:
-        config["model"]["in_channels"] = len(config["datamodule"]["band_names"])
+        config["model"]["in_channels"] = _count_channels(
+            config["datamodule"]["band_names"], task_specs.bands_info
+        )
 
     return config
 
