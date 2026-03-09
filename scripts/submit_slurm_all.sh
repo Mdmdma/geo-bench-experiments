@@ -1,4 +1,7 @@
 #!/bin/bash
+# Load eth proxy to give the instance access to the internet.
+# This is only needed for logging to wandb in an online run
+module load eth_proxy 
 # Submit all classification and segmentation benchmark runs to SLURM via sbatch.
 #
 # Usage:
