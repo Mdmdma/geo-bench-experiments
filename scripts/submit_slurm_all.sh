@@ -36,7 +36,7 @@ case "$MODEL" in
 esac
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
-REPO="/scratch3/merler/geo-bench-experiments"
+REPO="/cluster/home/merler/geo-bench-experiments"
 export GEO_BENCH_DIR="$DATA_DIR"
 
 # Patch benchmark_dir in temp copies of the task configs so no YAML needs editing
@@ -44,9 +44,9 @@ CLS_TASK_CONFIG=$(mktemp --suffix=.yaml)
 SEG_TASK_CONFIG=$(mktemp --suffix=.yaml)
 trap 'rm -f "$CLS_TASK_CONFIG" "$SEG_TASK_CONFIG"' EXIT
 
-sed "s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/classification_v1.0|" \
+sed "s|generate_experiment_dir:.*|generate_experiment_dir: $REPO/experiments/prithvi_cls_all|; s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/classification_v1.0|" \
     "$REPO/geobench_exp/configs/prithvi_cls_all_task.yaml" > "$CLS_TASK_CONFIG"
-sed "s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/segmentation_v1.0|" \
+sed "s|generate_experiment_dir:.*|generate_experiment_dir: $REPO/experiments/prithvi_seg_all|; s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/segmentation_v1.0|" \
     "$REPO/geobench_exp/configs/prithvi_seg_all_task.yaml" > "$SEG_TASK_CONFIG"
 
 # ─── SLURM settings ───────────────────────────────────────────────────────────
