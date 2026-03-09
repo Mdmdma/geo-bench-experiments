@@ -13,6 +13,10 @@ module load eth_proxy
 
 set -euo pipefail
 
+# ─── Data directory ───────────────────────────────────────────────────────────
+# Set this to the root folder containing classification_v1.0/ and segmentation_v1.0/
+DATA_DIR="/cluster/scratch/merler/geobench"
+
 # ─── Model selection ──────────────────────────────────────────────────────────
 MODEL="${1:-tiny}"   # Change to "100m" for full evaluation
 
@@ -33,10 +37,17 @@ esac
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 REPO="/scratch3/merler/geo-bench-experiments"
-export GEO_BENCH_DIR="/scratch3/merler/geo-bench/datasets"
+export GEO_BENCH_DIR="$DATA_DIR"
 
-CLS_TASK_CONFIG="$REPO/geobench_exp/configs/prithvi_cls_all_task.yaml"
-SEG_TASK_CONFIG="$REPO/geobench_exp/configs/prithvi_seg_all_task.yaml"
+# Patch benchmark_dir in temp copies of the task configs so no YAML needs editing
+CLS_TASK_CONFIG=$(mktemp --suffix=.yaml)
+SEG_TASK_CONFIG=$(mktemp --suffix=.yaml)
+trap 'rm -f "$CLS_TASK_CONFIG" "$SEG_TASK_CONFIG"' EXIT
+
+sed "s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/classification_v1.0|" \
+    "$REPO/geobench_exp/configs/prithvi_cls_all_task.yaml" > "$CLS_TASK_CONFIG"
+sed "s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/segmentation_v1.0|" \
+    "$REPO/geobench_exp/configs/prithvi_seg_all_task.yaml" > "$SEG_TASK_CONFIG"
 
 # ─── SLURM settings ───────────────────────────────────────────────────────────
 SBATCH_ARGS=(
