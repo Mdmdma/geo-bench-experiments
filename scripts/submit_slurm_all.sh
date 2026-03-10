@@ -38,6 +38,7 @@ case "$MODEL" in
     CLS_MODEL_CONFIG="geobench_exp/configs/model_configs/classification/prithvi_v2_600_all_bands.yaml"
     SEG_MODEL_CONFIG="geobench_exp/configs/model_configs/segmentation/prithvi_v2_600_tl.yaml"
     GPU_MEM="11G"
+
     JOB_TIME="12:00:00"
     ;;
   *)
@@ -48,6 +49,7 @@ esac
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 REPO="/cluster/home/merler/geo-bench-experiments"
+EXPERIMENTS_DIR="/cluster/scratch/merler/experiments"
 export GEO_BENCH_DIR="$DATA_DIR"
 
 # Patch benchmark_dir in temp copies of the task configs so no YAML needs editing
@@ -55,9 +57,9 @@ CLS_TASK_CONFIG=$(mktemp --suffix=.yaml)
 SEG_TASK_CONFIG=$(mktemp --suffix=.yaml)
 trap 'rm -f "$CLS_TASK_CONFIG" "$SEG_TASK_CONFIG"' EXIT
 
-sed "s|generate_experiment_dir:.*|generate_experiment_dir: $REPO/experiments/prithvi_cls_all|; s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/classification_v1.0|" \
+sed "s|generate_experiment_dir:.*|generate_experiment_dir: $EXPERIMENTS_DIR/prithvi_cls_all|; s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/classification_v1.0|" \
     "$REPO/geobench_exp/configs/prithvi_cls_all_task.yaml" > "$CLS_TASK_CONFIG"
-sed "s|generate_experiment_dir:.*|generate_experiment_dir: $REPO/experiments/prithvi_seg_all|; s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/segmentation_v1.0|" \
+sed "s|generate_experiment_dir:.*|generate_experiment_dir: $EXPERIMENTS_DIR/prithvi_seg_all|; s|benchmark_dir:.*|benchmark_dir: $DATA_DIR/segmentation_v1.0|" \
     "$REPO/geobench_exp/configs/prithvi_seg_all_task.yaml" > "$SEG_TASK_CONFIG"
 
 # ─── SLURM settings ───────────────────────────────────────────────────────────
@@ -119,8 +121,8 @@ submit_jobs() {
 }
 
 # ─── Submit ───────────────────────────────────────────────────────────────────
-submit_jobs "$REPO/experiments/prithvi_cls_all" "classification"
-submit_jobs "$REPO/experiments/prithvi_seg_all" "segmentation"
+submit_jobs "$EXPERIMENTS_DIR/prithvi_cls_all" "classification"
+submit_jobs "$EXPERIMENTS_DIR/prithvi_seg_all" "segmentation"
 
 echo ""
 echo "All jobs submitted. Monitor with:"

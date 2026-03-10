@@ -22,7 +22,7 @@ def generate_trainer(config: dict, job) -> Trainer:
     run_id = "".join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(8))
 
     loggers = [
-        CSVLogger(str(job.dir), name="csv_logs"),
+        CSVLogger(str(job.output_dir), name="csv_logs"),
     ]
     if "wandb" in config:
         config["wandb"]["wandb_run_id"] = run_id
@@ -31,7 +31,7 @@ def generate_trainer(config: dict, job) -> Trainer:
         run_name = f"{base_name}_{ds_name_short}" if base_name else ds_name_short
         loggers.append(
             WandbLogger(
-                save_dir=str(job.dir),
+                save_dir=str(job.output_dir),
                 project=config["wandb"]["project"],
                 entity=config["wandb"]["entity"],
                 id=run_id,
@@ -45,7 +45,7 @@ def generate_trainer(config: dict, job) -> Trainer:
 
     job.save_config(config, overwrite=True)
 
-    ckpt_dir = os.path.join(job.dir, "checkpoint")
+    ckpt_dir = os.path.join(job.output_dir, "checkpoint")
 
     ds_name = job.task_specs.dataset_name
 
@@ -94,9 +94,6 @@ def generate_trainer(config: dict, job) -> Trainer:
         track_metric = config["model"]["early_stopping_metric"]
         mode = "min"
 
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=ckpt_dir, save_top_k=1, monitor=track_metric, mode=mode, every_n_epochs=1
-    )
     patience = int((1 / config["trainer"]["val_check_interval"]) * (config["trainer"]["max_epochs"] / 6))
     early_stopping_callback = EarlyStopping(
         monitor=track_metric,
@@ -105,14 +102,20 @@ def generate_trainer(config: dict, job) -> Trainer:
         min_delta=1e-5,
     )
 
+    callbacks = [early_stopping_callback]
+    save_ckpt = (config.get("experiment") or {}).get("save_checkpoints", False)
+    if save_ckpt:
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=ckpt_dir, save_top_k=1, monitor=track_metric, mode=mode, every_n_epochs=1
+        )
+        callbacks.append(checkpoint_callback)
+
     trainer = instantiate(
         config.trainer,
-        default_root_dir=job.dir,
-        callbacks=[
-            early_stopping_callback,
-            checkpoint_callback,
-        ],
+        default_root_dir=job.output_dir,
+        callbacks=callbacks,
         logger=loggers,
+        enable_checkpointing=save_ckpt,
     )
 
     return trainer

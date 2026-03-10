@@ -7,6 +7,8 @@ experiment:
   # No ignore_tasks → all 6 segmentation datasets are included:
   # m-cashew-plant, m-chesapeake, m-NeonTree, m-nz-cattle, m-pv4ger-seg, m-SA-crop-type
   num_seeds: 1
+  output_dir: null         # set to redirect logs/checkpoints to scratch (different from job metadata dir)
+  save_checkpoints: false  # set true to save best-model checkpoint
 
 datamodule:
   _target_: geobench_exp.torch_toolbox.dataset.DataModule

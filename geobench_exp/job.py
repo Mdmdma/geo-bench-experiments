@@ -31,6 +31,21 @@ class Job:
         self.dir = Path(dir)
         self.dir.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def output_dir(self) -> Path:
+        """Return the directory where training outputs (logs, checkpoints) are written.
+
+        Falls back to ``self.dir`` when no separate output directory is configured.
+        Set ``experiment.job_output_dir`` in the job config to redirect outputs to a
+        different location (e.g. scratch storage).
+        """
+        job_output_dir = self.config.get("experiment", {}).get("job_output_dir", None)
+        if job_output_dir:
+            out = Path(job_output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            return out
+        return self.dir
+
     @cached_property
     def task_specs(self) -> TaskSpecifications:
         """Return task specifications."""
@@ -72,14 +87,14 @@ class Job:
             import wandb
 
             wandb.finish()
-            summary = glob.glob(str(self.dir / "wandb" / "latest-run" / "*" / "wandb-summary.json"))
+            summary = glob.glob(str(self.output_dir / "wandb" / "latest-run" / "*" / "wandb-summary.json"))
 
             with open(summary[0], "r") as infile:
                 data: Dict[str, Any] = json.load(infile)
             return data
         else:
             try:
-                with open(self.dir / "csv_logs" / "version_0" / "metrics.csv", "r") as fd:
+                with open(self.output_dir / "csv_logs" / "version_0" / "metrics.csv", "r") as fd:
                     data: Dict[str, Any] = {}  # type: ignore[no-redef]
                     # FIXME: This would be more efficient if done backwards
                     for entry in csv.DictReader(fd):

@@ -7,6 +7,8 @@ experiment:
   # No ignore_tasks → all 6 classification datasets are included:
   # m-brick-kiln, m-bigearthnet, m-eurosat, m-so2sat, m-pv4ger, m-forestnet
   num_seeds: 1
+  output_dir: null         # set to redirect logs/checkpoints to scratch (different from job metadata dir)
+  save_checkpoints: false  # set true to save best-model checkpoint
 
 datamodule:
   _target_: geobench_exp.torch_toolbox.dataset.DataModule

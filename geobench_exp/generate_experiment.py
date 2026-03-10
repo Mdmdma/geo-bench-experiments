@@ -116,6 +116,12 @@ def experiment_generator(task_config_path: str, model_config_path: str) -> None:
         for i in range(config["experiment"]["num_seeds"]):
             # set seed to be used in experiment
             task_config["experiment"]["seed"] = i
+            output_base = task_config["experiment"].get("output_dir", None)
+            if output_base:
+                job_output_dir = (
+                    Path(output_base) / experiment_dir.name / task_specs.dataset_name / f"seed_{i}"
+                )
+                OmegaConf.update(task_config, "experiment.job_output_dir", str(job_output_dir))
             job_dir = experiment_dir / task_specs.dataset_name / f"seed_{i}"
             job = Job(job_dir)
             job.save_config(task_config)
