@@ -10,6 +10,7 @@ module load eth_proxy
 # Model sizes:
 #   tiny  - prithvi_eo_v2_tiny_tl  (default, for debugging / fast iteration)
 #   100m  - prithvi_eo_v2_100_tl   (for real evaluation)
+#   600m  - prithvi_eo_v2_600_tl   (largest model, needs 11G GPU, 12h)
 
 set -euo pipefail
 
@@ -24,13 +25,23 @@ case "$MODEL" in
   tiny)
     CLS_MODEL_CONFIG="geobench_exp/configs/model_configs/classification/prithvi_v2_tiny_all_bands.yaml"
     SEG_MODEL_CONFIG="geobench_exp/configs/model_configs/segmentation/prithvi_v2_tiny_all_bands.yaml"
+    GPU_MEM="11G"
+    JOB_TIME="06:00:00"
     ;;
   100m)
     CLS_MODEL_CONFIG="geobench_exp/configs/model_configs/classification/prithvi_v2_100_all_bands.yaml"
     SEG_MODEL_CONFIG="geobench_exp/configs/model_configs/segmentation/prithvi_v2_100_tl.yaml"
+    GPU_MEM="11G"
+    JOB_TIME="06:00:00"
+    ;;
+  600m)
+    CLS_MODEL_CONFIG="geobench_exp/configs/model_configs/classification/prithvi_v2_600_all_bands.yaml"
+    SEG_MODEL_CONFIG="geobench_exp/configs/model_configs/segmentation/prithvi_v2_600_tl.yaml"
+    GPU_MEM="11G"
+    JOB_TIME="12:00:00"
     ;;
   *)
-    echo "ERROR: Unknown model '$MODEL'. Use 'tiny' or '100m'."
+    echo "ERROR: Unknown model '$MODEL'. Use 'tiny', '100m', or '600m'."
     exit 1
     ;;
 esac
@@ -52,12 +63,12 @@ sed "s|generate_experiment_dir:.*|generate_experiment_dir: $REPO/experiments/pri
 # ─── SLURM settings ───────────────────────────────────────────────────────────
 SBATCH_ARGS=(
   --account=es_schin
-  --time=06:00:00
+  --time=$JOB_TIME
   --ntasks=1
-  --cpus-per-task=10
-  --mem-per-cpu=2G
+  --cpus-per-task=6
+  --mem-per-cpu=4G
   --gpus=1
-  --gres=gpumem:11G
+  --gres=gpumem:$GPU_MEM
 )
 
 # ─── Generate experiment job directories ──────────────────────────────────────

@@ -1,0 +1,15 @@
+model:
+  _target_: geobench_exp.torch_toolbox.prithvi_model.GeoBenchPrithviSegmentation
+  prithvi_variant: "prithvi_eo_v2_600_tl"  # 600M Prithvi-EO v2 (TL = temporal+location encoding)
+  pretrained: true                          # downloads from ibm-nasa-geospatial/Prithvi-EO-2.0-600M-TL
+  freeze_backbone: false
+  decoder_type: "UperNetDecoder"
+  optimizer:
+    _target_: torch.optim.AdamW
+    _partial_: true
+    lr: 6e-5
+    weight_decay: 0.05
+
+datamodule:
+  batch_size: 8
+  band_names: "all"   # resolved to all dataset bands at generation time
