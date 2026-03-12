@@ -1,7 +1,7 @@
 model:
   _target_: geobench_exp.torch_toolbox.prithvi_model.GeoBenchPrithviSegmentation
-  prithvi_variant: "prithvi_eo_v2_600_tl"  # 600M Prithvi-EO v2 (TL = temporal+location encoding)
-  pretrained: true                          # downloads from ibm-nasa-geospatial/Prithvi-EO-2.0-600M-TL
+  prithvi_variant: "prithvi_eo_v2_300_tl"  # 300M Prithvi-EO v2 (TL = temporal+location encoding)
+  pretrained: true                          # downloads from ibm-nasa-geospatial/Prithvi-EO-2.0-300M-TL
   freeze_backbone: false
   decoder_type: "FCNDecoder"  # UperNetDecoder fails at batch_size=1 due to PSP 1×1 pool + BatchNorm
   optimizer:
